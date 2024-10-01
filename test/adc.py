@@ -13,6 +13,9 @@ import time
 adc = ADC(Pin(4)) 
 adc.atten(ADC.ATTN_11DB) #开启衰减器，测量量程增大到3.3V
 
+in1 = PWM(Pin(5,Pin.OUT), freq=100000, duty=0)
+in2 = Pin(6,Pin.OUT, value=0)
+
 in3 = PWM(Pin(10,Pin.OUT), freq=100000, duty=0)
 in4 = Pin(9,Pin.OUT, value=0) 
 
@@ -28,7 +31,8 @@ def ADC_Test(tim):
     v_pwm = int(rate * 1023)
 
     in3.duty(v_pwm)
-
+    in1.duty(v_pwm)
+    
     #计算电压值，获得的数据0-4095相当于0-3.3V，（'%.2f'%）表示保留2位小数
     print(f'raw data:{adc.read()} rate: {rate:.2}  voltage:{('%.2f'%(rate*3.3))}V')
 
