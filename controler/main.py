@@ -1,40 +1,71 @@
+import json  # 导入ujson库，用于处理JSON格式
 import network
 import espnow
-from machine import Pin,SoftI2C,ADC,Timer, PWM
+from machine import Pin, ADC, Timer
 import time
 
-# A WLAN interface must be active to send()/recv()
-sta = network.WLAN(network.STA_IF)  # Or network.AP_IF
+# 初始化 wifi
+sta = network.WLAN(network.STA_IF)  # 或者使用 network.AP_IF
 sta.active(True)
-sta.disconnect()      # For ESP8266
+sta.disconnect()      # 对于 ESP8266
 
+# 初始化 espnow
 e = espnow.ESPNow()
 e.active(True)
-peer = b'\xff\xff\xff\xff\xff\xff'  # MAC address of peer's wifi interface
-e.add_peer(peer)      # Must add_peer() before send()
+peer = b'\xff\xff\xff\xff\xff\xff'  # 使用广播地址
+e.add_peer(peer)      
+# e.send(peer, "Starting...")
 
-e.send(peer, "Starting...")
+# 初始化 adc 摇杆输入
+lx = ADC(Pin(4)) 
+lx.atten(ADC.ATTN_11DB)  # 开启衰减器，测量量程增大到3.3V 
 
+ry = ADC(Pin(16))
+ry.atten(ADC.ATTN_11DB)
 
-#构建ADC对象
-adc = ADC(Pin(15)) 
-adc.atten(ADC.ATTN_11DB) #开启衰减器，测量量程增大到3.3V
+# 初始化 开关
+rotate_sw = False
+def switch_callback(pin):
+    global rotate_sw
+    # 防抖
+    time.sleep_ms(100)
+    if pin.value() == 0:
+        rotate_sw = not rotate_sw
+        print(f"开关: {rotate_sw}")
 
-def ADC_Test(tim):
+btn = Pin(1, Pin.IN, Pin.PULL_UP)
+btn.irq(switch_callback,Pin.IRQ_FALLING)
 
-    raw_data = adc.read()
+def main(tim_callback):
 
-    rate = raw_data / 8191
+    global rotate_sw
     
-    #rate_int = int(rate * 100)
+    if rotate_sw:
+        lx_raw  = 8191 - lx.read()  # 前进速度
+        lx_rate = lx_raw / 8191
 
-    #in3.duty(v_pwm)
-    e.send(peer, f"{raw_data}")
-    
-    #计算电压值，获得的数据0-4095相当于0-3.3V，（'%.2f'%）表示保留2位小数
-    print(f'raw data:{adc.read()} rate: {rate:.2}  voltage:{('%.2f'%(rate*3.3))}V')
+        ry_raw  = 8191 - ry.read() - 3270  # 转向速度
+        ry_rate = ry_raw / 8191
+        
+        # 计算电机速度
+        l_motor = (lx_rate * 0.98 + ry_rate * 0.2) * 1023
+        r_motor = (lx_rate * 0.98 - ry_rate * 0.2) * 1023
 
+        # 限位 和 化整
+        l_motor = int(max(0, min(1023, l_motor)))
+        r_motor = int(max(0, min(1023, r_motor)))
 
-#开启定时器
+        # 使用 JSON 格式发送数据
+        data = {"l_motor": l_motor, "r_motor": r_motor}
+        e.send(peer, json.dumps(data))  # 将数据转换为 JSON 字符串并发送
+        
+        print(f'前进速度:{lx_raw}, 转向速度:{ry_raw}, l_motor:{l_motor}, r_motor:{r_motor}')
+
+    else:
+        # 使用 JSON 格式发送数据
+        data = {"l_motor": 0, "r_motor": 0}
+        e.send(peer, json.dumps(data))  # 将数据转换为 JSON 字符串并发送
+
+# 开启定时器
 tim = Timer(1)
-tim.init(period=200, mode=Timer.PERIODIC, callback=ADC_Test) #周期300ms
+tim.init(period=20, mode=Timer.PERIODIC, callback=main)  # 周期200ms
