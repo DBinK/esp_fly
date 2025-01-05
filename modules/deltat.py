@@ -73,3 +73,15 @@ class DeltaT():
         dt = self.timediff(ts, self.start_time)
         self.start_time = ts
         return dt
+
+if __name__ == '__main__':
+    
+    import time
+
+    delta_t = DeltaT(None)
+    print("Testing with default timediff function (MicroPython-like environment):")
+    for _ in range(5):
+        time.sleep(0.1)  # 模拟时间间隔
+        dt = delta_t(None)
+        print(f"Time difference: {dt:.6f} seconds")
+
