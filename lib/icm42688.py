@@ -133,9 +133,9 @@ class ICM42688P:
 # Example usage
 if __name__ == "__main__":
     
-    spi = SPI(1, sck=Pin(5), mosi=Pin(6), miso=Pin(7))
+    spi = SPI(1, sck=Pin(3), mosi=Pin(5), miso=Pin(7))
     
-    cs_pin = 8  # Replace with your actual CS pin number
+    cs_pin = 9  # Replace with your actual CS pin number
     
     imu = ICM42688P(spi, cs_pin)
     imu.initialize()
@@ -145,7 +145,7 @@ if __name__ == "__main__":
         gyro_x, gyro_y, gyro_z = imu.read_gyroscope()
         temp = imu.read_temperature()
 
-        print(f"Accel: X={accel_x:.2f} G, Y={accel_y:.2f} G, Z={accel_z:.2f} G")
+        #print(f"Accel: X={accel_x:.2f} G, Y={accel_y:.2f} G, Z={accel_z:.2f} G")
         print(f"Gyro: X={gyro_x:.2f} DPS, Y={gyro_y:.2f} DPS, Z={gyro_z:.2f} DPS")
-        print(f"Temperature: {temp:.2f} C")
-        time.sleep(0.001)
+        #print(f"Temperature: {temp:.2f} C")
+        time.sleep(0.0001)

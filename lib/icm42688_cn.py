@@ -63,7 +63,7 @@ class ICM42688P:
     def initialize(self):
         """初始化传感器"""
         # 复位设备
-        self._write_register(ICM42688_REG_BANK_SEL, 0x00)  # 选择银行0
+        self._write_register(ICM42688_REG_BANK_SEL, 0x00)   # 选择银行0
         self._write_register(ICM42688_DEVICE_CONFIG, 0x01)  # 复位
         time.sleep(0.1)
 
@@ -86,12 +86,12 @@ class ICM42688P:
 
     def configure_accelerometer(self, scale=ICM42688_AFS_16G, odr=ICM42688_AODR_1kHz):
         """配置加速度计"""
-        self.accel_scale = 16.0  # 默认满量程为16G
+        self.accel_scale = 16.0                  # 默认满量程为16G
         self._write_register(0x50, scale | odr)  # ACCEL_CONFIG0
 
     def configure_gyroscope(self, scale=ICM42688_GFS_2000DPS, odr=ICM42688_GODR_1kHz):
         """配置陀螺仪"""
-        self.gyro_scale = 2000.0  # 默认满量程为2000 DPS
+        self.gyro_scale = 2000.0                 # 默认满量程为2000 DPS
         self._write_register(0x4F, scale | odr)  # GYRO_CONFIG0
 
     def read_accelerometer(self):
@@ -133,19 +133,24 @@ class ICM42688P:
 # 示例用法
 if __name__ == "__main__":
     
-    spi = SPI(1, sck=Pin(5), mosi=Pin(6), miso=Pin(7))  # 替换为实际的SPI接口
+    spi = SPI(1, sck=Pin(3), mosi=Pin(5), miso=Pin(7))
     
-    cs_pin = 8  # 替换为实际的CS引脚编号
+    cs_pin = 9  # 替换为实际的CS引脚编号
     
     imu = ICM42688P(spi, cs_pin)
     imu.initialize()
 
-    while True:
+    led = Pin(15, Pin.OUT)
+    led.value(1)
+
+    while True: 
         accel_x, accel_y, accel_z = imu.read_accelerometer()
         gyro_x, gyro_y, gyro_z = imu.read_gyroscope()
         temp = imu.read_temperature()
 
         print(f"加速度: X={accel_x:.2f} G, Y={accel_y:.2f} G, Z={accel_z:.2f} G")
-        print(f"角速度: X={gyro_x:.2f} DPS, Y={gyro_y:.2f} DPS, Z={gyro_z:.2f} DPS")
-        print(f"温度: {temp:.2f} C")
+        #print(f"角速度: X={gyro_x:.2f} DPS, Y={gyro_y:.2f} DPS, Z={gyro_z:.2f} DPS")
+        #print(f"温度: {temp:.2f} C")
         time.sleep(0.001)
+
+        led.value(not led.value())   
