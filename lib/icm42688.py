@@ -1,8 +1,6 @@
 import time
 import struct
-import board
-import busio
-import digitalio
+from machine import Pin, SPI
 
 # Register addresses
 ICM42688_DEVICE_CONFIG = 0x11
@@ -34,55 +32,32 @@ class ICM42688P:
     def __init__(self, spi, cs_pin):
         # SPI and CS pin setup
         self.spi = spi
-        self.cs = digitalio.DigitalInOut(cs_pin)
-        self.cs.switch_to_output(value=True)
+        self.cs = Pin(cs_pin, Pin.OUT, value=1)
         self.accel_scale = 16.0  # Default scale for accelerometer (16G)
         self.gyro_scale = 2000.0  # Default scale for gyroscope (2000 DPS)
 
-    def _spi_lock(self):
-        """Acquire SPI lock and configure settings."""
-        while not self.spi.try_lock():
-            pass
-        self.spi.configure(baudrate=1000000, phase=0, polarity=0)
-
-    def _spi_unlock(self):
-        """Release SPI lock."""
-        self.spi.unlock()
-
     def _write_register(self, reg, value):
         """Write a byte to a specific register."""
-        self._spi_lock()
-        try:
-            self.cs.value = False
-            self.spi.write(bytearray([reg & 0x7F, value]))
-            self.cs.value = True
-        finally:
-            self._spi_unlock()
+        self.cs.value(0)
+        self.spi.write(bytearray([reg & 0x7F, value]))
+        self.cs.value(1)
 
     def _read_register(self, reg):
         """Read a byte from a specific register."""
-        self._spi_lock()
-        try:
-            self.cs.value = False
-            self.spi.write(bytearray([reg | 0x80]))
-            result = bytearray(1)
-            self.spi.readinto(result)
-            self.cs.value = True
-        finally:
-            self._spi_unlock()
+        self.cs.value(0)
+        self.spi.write(bytearray([reg | 0x80]))
+        result = bytearray(1)
+        self.spi.readinto(result)
+        self.cs.value(1)
         return result[0]
 
     def _read_multiple_registers(self, reg, length):
         """Read multiple bytes starting from a specific register."""
-        self._spi_lock()
-        try:
-            self.cs.value = False
-            self.spi.write(bytearray([reg | 0x80]))
-            result = bytearray(length)
-            self.spi.readinto(result)
-            self.cs.value = True
-        finally:
-            self._spi_unlock()
+        self.cs.value(0)
+        self.spi.write(bytearray([reg | 0x80]))
+        result = bytearray(length)
+        self.spi.readinto(result)
+        self.cs.value(1)
         return result
 
     def initialize(self):
@@ -155,3 +130,22 @@ class ICM42688P:
         return temperature
 
 
+# Example usage
+if __name__ == "__main__":
+    
+    spi = SPI(1, sck=Pin(5), mosi=Pin(6), miso=Pin(7))
+    
+    cs_pin = 8  # Replace with your actual CS pin number
+    
+    imu = ICM42688P(spi, cs_pin)
+    imu.initialize()
+
+    while True:
+        accel_x, accel_y, accel_z = imu.read_accelerometer()
+        gyro_x, gyro_y, gyro_z = imu.read_gyroscope()
+        temp = imu.read_temperature()
+
+        print(f"Accel: X={accel_x:.2f} G, Y={accel_y:.2f} G, Z={accel_z:.2f} G")
+        print(f"Gyro: X={gyro_x:.2f} DPS, Y={gyro_y:.2f} DPS, Z={gyro_z:.2f} DPS")
+        # print(f"Temperature: {temp:.2f} C")
+        time.sleep(0.001)
