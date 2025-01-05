@@ -130,8 +130,11 @@ class ICM42688P:
         return temperature
 
 
+
 # 示例用法
 if __name__ == "__main__":
+    from modules.utils import TimeDiff
+    main_dt = TimeDiff()
     
     spi = SPI(1, sck=Pin(3), mosi=Pin(5), miso=Pin(7))
     
@@ -143,14 +146,30 @@ if __name__ == "__main__":
     led = Pin(15, Pin.OUT)
     led.value(1)
 
+
+    # 初始化yaw角
+    yaw_angle = 0.0
+
+    # 获取当前时间
+    current_time = time.time()
+
     while True: 
         accel_x, accel_y, accel_z = imu.read_accelerometer()
         gyro_x, gyro_y, gyro_z = imu.read_gyroscope()
-        temp = imu.read_temperature()
+        # temp = imu.read_temperature()
 
-        print(f"加速度: X={accel_x:.2f} G, Y={accel_y:.2f} G, Z={accel_z:.2f} G")
+        # 计算时间差
+        dt = main_dt.time_diff() / 1_000_000_000  # 将ns转换为s
+        
+        # 对陀螺仪的z轴数据进行积分以计算yaw角
+        yaw_angle += gyro_z * dt
+    
+        # 打印或使用yaw_angle
+        print(f"Yaw Angle: {yaw_angle} , dt: {dt:.6f}")
+
+        #print(f"加速度: X={accel_x:.2f} G, Y={accel_y:.2f} G, Z={accel_z:.2f} G")
         #print(f"角速度: X={gyro_x:.2f} DPS, Y={gyro_y:.2f} DPS, Z={gyro_z:.2f} DPS")
         #print(f"温度: {temp:.2f} C")
-        time.sleep(0.001)
+        time.sleep(0.01)
 
         led.value(not led.value())   

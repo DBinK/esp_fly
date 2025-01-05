@@ -34,6 +34,7 @@ if Timing:
     print("Update time (uS):", t)
 
 count = 0
+
 while True:
     #fuse.update_nomag(imu.read_accelerometer(), imu.read_gyroscope())
     fuse.update(imu.read_accelerometer(), imu.read_gyroscope())
@@ -42,27 +43,3 @@ while True:
     time.sleep_ms(20)
     count += 1
 
-# 示例用法
-if __name__ == "__main__":
-    
-    spi = SPI(1, sck=Pin(3), mosi=Pin(5), miso=Pin(7))
-    
-    cs_pin = 9  # 替换为实际的CS引脚编号
-    
-    imu = ICM42688P(spi, cs_pin)
-    imu.initialize()
-
-    led = Pin(15, Pin.OUT)
-    led.value(1)
-
-    while True: 
-        accel_x, accel_y, accel_z = imu.read_accelerometer()
-        gyro_x, gyro_y, gyro_z = imu.read_gyroscope()
-        temp = imu.read_temperature()
-
-        print(f"加速度: X={accel_x:.2f} G, Y={accel_y:.2f} G, Z={accel_z:.2f} G")
-        #print(f"角速度: X={gyro_x:.2f} DPS, Y={gyro_y:.2f} DPS, Z={gyro_z:.2f} DPS")
-        #print(f"温度: {temp:.2f} C")
-        time.sleep(0.001)
-
-        led.value(not led.value())   
