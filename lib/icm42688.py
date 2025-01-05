@@ -3,26 +3,26 @@ import struct
 from machine import Pin, SPI
 
 # Register addresses
-ICM42688_DEVICE_CONFIG = 0x11
-ICM42688_PWR_MGMT0 = 0x4E
-ICM42688_WHO_AM_I = 0x75
-ICM42688_ACCEL_DATA_X1 = 0x1F
-ICM42688_ACCEL_DATA_X0 = 0x20
-ICM42688_GYRO_DATA_X1 = 0x25
-ICM42688_GYRO_DATA_X0 = 0x26
-ICM42688_REG_BANK_SEL = 0x76
-ICM42688_TEMP_DATA1 = 0x1D
+ICM42688_DEVICE_CONFIG = 0x11  # Device configuration register
+ICM42688_PWR_MGMT0 = 0x4E      # Power management control register 0
+ICM42688_WHO_AM_I = 0x75       # Device identification register
+ICM42688_ACCEL_DATA_X1 = 0x1F  # Accelerometer X-axis data high byte
+ICM42688_ACCEL_DATA_X0 = 0x20  # Accelerometer X-axis data low byte
+ICM42688_GYRO_DATA_X1 = 0x25   # Gyroscope X-axis data high byte
+ICM42688_GYRO_DATA_X0 = 0x26   # Gyroscope X-axis data low byte
+ICM42688_REG_BANK_SEL = 0x76   # Register bank selection register
+ICM42688_TEMP_DATA1 = 0x1D     # Temperature data high byte
 
 # Bitmasks for configuration
-ICM42688_PWR_TEMP_ON = 0 << 5
-ICM42688_PWR_TEMP_OFF = 1 << 5
-ICM42688_PWR_GYRO_MODE_LN = 3 << 2
-ICM42688_PWR_ACCEL_MODE_LN = 3 << 0
+ICM42688_PWR_TEMP_ON = 0 << 5         # Temperature sensor enabled
+ICM42688_PWR_TEMP_OFF = 1 << 5        # Temperature sensor disabled
+ICM42688_PWR_GYRO_MODE_LN = 3 << 2    # Gyroscope low noise mode
+ICM42688_PWR_ACCEL_MODE_LN = 3 << 0   # Accelerometer low noise mode
 
-ICM42688_GFS_2000DPS = 0x00 << 5
-ICM42688_AFS_16G = 0x00 << 5
-ICM42688_GODR_1kHz = 0x06
-ICM42688_AODR_1kHz = 0x06
+ICM42688_GFS_2000DPS = 0x00 << 5  # Gyroscope full scale range set to 2000 degrees per second
+ICM42688_AFS_16G = 0x00 << 5      # Accelerometer full scale range set to 16G
+ICM42688_GODR_1kHz = 0x06         # Gyroscope output data rate set to 1 kHz
+ICM42688_AODR_1kHz = 0x06         # Accelerometer output data rate set to 1 kHz
 
 # Timeout for SPI communication (in seconds)
 SPI_TIMEOUT = 0.5
@@ -147,5 +147,5 @@ if __name__ == "__main__":
 
         print(f"Accel: X={accel_x:.2f} G, Y={accel_y:.2f} G, Z={accel_z:.2f} G")
         print(f"Gyro: X={gyro_x:.2f} DPS, Y={gyro_y:.2f} DPS, Z={gyro_z:.2f} DPS")
-        # print(f"Temperature: {temp:.2f} C")
+        print(f"Temperature: {temp:.2f} C")
         time.sleep(0.001)
