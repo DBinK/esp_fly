@@ -1,4 +1,5 @@
 import time
+import math
 import struct
 from machine import Pin, SPI
 
@@ -71,7 +72,7 @@ class ICM42688P:
         who_am_i = self._read_register(ICM42688_WHO_AM_I)
         if who_am_i != 0x47:
             raise RuntimeError(f"意外的WHO_AM_I值: 0x{who_am_i:02X}")
-        print("ICM42688P初始化成功！")
+        # print(f"ICM42688P初始化成功！WHO_AM_I值: 0x{who_am_i:02X}")
 
         # 启用所有传感器
         self._write_register(
@@ -133,7 +134,13 @@ class ICM42688P:
 
 # 示例用法
 if __name__ == "__main__":
+
+    import math
     from modules.utils import TimeDiff
+    
+    import modules.fusion as fusion
+
+
     main_dt = TimeDiff()
     
     spi = SPI(1, sck=Pin(3), mosi=Pin(5), miso=Pin(7))
@@ -146,12 +153,14 @@ if __name__ == "__main__":
     led = Pin(15, Pin.OUT)
     led.value(1)
 
+    fuse = fusion.Fusion()
 
     # 初始化yaw角
-    yaw_angle = 0.0
+    yaw = 0.0
+    
+    DEG2RAD = math.pi / 180.0
+    RAD2DEG = 180.0 / math.pi
 
-    # 获取当前时间
-    current_time = time.time()
 
     while True: 
         accel_x, accel_y, accel_z = imu.read_accelerometer()
@@ -160,12 +169,23 @@ if __name__ == "__main__":
 
         # 计算时间差
         dt = main_dt.time_diff() / 1_000_000_000  # 将ns转换为s
+        Hz = int(1/dt) if dt > 0.0001 else 0  # 避免第一次的数很大
         
         # 对陀螺仪的z轴数据进行积分以计算yaw角
-        yaw_angle += gyro_z * dt
+        yaw += gyro_z * dt
     
-        # 打印或使用yaw_angle
-        print(f"Yaw Angle: {yaw_angle} , dt: {dt:.6f}")
+        # print(f"Yaw Angle: {yaw} , dt: {dt:.6f}, Hz: {int(1/dt)}")
+
+        # 计算 pitch 和 roll
+        pitch = math.atan2(accel_x, math.sqrt(accel_y**2 + accel_z**2)) * RAD2DEG
+        roll  = math.atan2(accel_y, math.sqrt(accel_x**2 + accel_z**2)) * RAD2DEG
+    
+        # 打印
+        print(f"raw: {yaw=:.2f}, {pitch=:.2f}, {roll=:.2f}, {dt=:.3f}, {Hz=}")
+
+        # 更新融合数据
+        #fuse.update_nomag((accel_x, accel_y, accel_z), (gyro_x, gyro_y, gyro_z))
+        #print(f"fuse: {fuse.heading:.2f}, {fuse.pitch:.2f}, {(180-fuse.roll):.2f}")
 
         #print(f"加速度: X={accel_x:.2f} G, Y={accel_y:.2f} G, Z={accel_z:.2f} G")
         #print(f"角速度: X={gyro_x:.2f} DPS, Y={gyro_y:.2f} DPS, Z={gyro_z:.2f} DPS")
