@@ -1,71 +1,98 @@
-import json  # 导入ujson库，用于处理JSON格式
-import network
-import espnow
-from machine import Pin, ADC, Timer
+# 标准库
 import time
+import json
+import network
+import _thread
+import espnow
+from machine import Pin, ADC
+
+# 本地库
+import modules.gamepad as gamepad
+import modules.lcd as lcd
+from modules.utils import TimeDiff
+
+
+print("正在启动...") 
+time.sleep(2)  # 防止点停止按钮后马上再启动导致 Thonny 连接不上
 
 # 初始化 wifi
 sta = network.WLAN(network.STA_IF)  # 或者使用 network.AP_IF
 sta.active(True)
-sta.disconnect()      # 对于 ESP8266
+sta.disconnect()  # 对于 ESP8266
 
 # 初始化 espnow
-e = espnow.ESPNow()
-e.active(True)
-peer = b'\xff\xff\xff\xff\xff\xff'  # 使用广播地址
-e.add_peer(peer)      
-# e.send(peer, "Starting...")
+now = espnow.ESPNow()
+now.active(True)
+peer = b"\xff\xff\xff\xff\xff\xff"  # 使用广播地址
+now.add_peer(peer)
 
-# 初始化 adc 摇杆输入
-lx = ADC(Pin(4)) 
-lx.atten(ADC.ATTN_11DB)  # 开启衰减器，测量量程增大到3.3V 
+# 构建手柄对象
+gamepad = gamepad.Gamepad()
+main_dt = TimeDiff()
 
-ry = ADC(Pin(16))
-ry.atten(ADC.ATTN_11DB)
+gamepad_data = []
+diff = 1_000_000  #随便初始化一个数
 
-# 初始化 开关
-rotate_sw = False
-def switch_callback(pin):
-    global rotate_sw
-    # 防抖
-    time.sleep_ms(100)
-    if pin.value() == 0:
-        rotate_sw = not rotate_sw
-        print(f"开关: {rotate_sw}")
 
-btn = Pin(1, Pin.IN, Pin.PULL_UP)
-btn.irq(switch_callback,Pin.IRQ_FALLING)
-
-def main(tim_callback):
-
-    global rotate_sw
+def data_to_json(data):
+    data_dict = {
+        "ID": data[0],
+        "LX": data[1],
+        "LY": data[2],
+        "RX": data[3],
+        "RY": data[4],
+        "XABY/Pad": data[5],
+        "LS/RS/Start/Back": data[6],
+        "mode": data[7],
+    }
     
-    if rotate_sw:
-        lx_raw  = 8191 - lx.read()  # 前进速度
-        lx_rate = lx_raw / 8191
+    print(data_dict)
+    
+    return json.dumps(data_dict)
 
-        ry_raw  = 8191 - ry.read() - 3270  # 转向速度
-        ry_rate = ry_raw / 8191
+
+def show_lcd():
+    global gamepad_data, diff_ns
+    
+    time.sleep(1)  # 延时1秒, 不然不显示
+
+    while True:
+
+        lcd.show_gamepad(gamepad_data, diff_ns)  #lcd显示数据
+
+        time.sleep(0.1) 
+
+
+def send_espnow():
+    global gamepad_data, peer, diff_ns
+
+    while True:
+        gamepad_data = gamepad.read()
+
+        # data_json = data_to_json(data)  # 将数据转换为 JSON 字符串并发送
+
+        data_json = json.dumps(gamepad_data)      # 将列表直接转换为 JSON 字符串
+
+        now.send(peer, data_json) 
+        print(f"发送数据: {gamepad_data}") 
+
+        diff_ns = main_dt.time_diff() 
+        print(f"延迟ms: {diff_ns / 1000_000}, 频率Hz: {1_000_000_000 / diff_ns}")
         
-        # 计算电机速度
-        l_motor = (lx_rate * 0.98 + ry_rate * 0.2) * 1023
-        r_motor = (lx_rate * 0.98 - ry_rate * 0.2) * 1023
-
-        # 限位 和 化整
-        l_motor = int(max(0, min(1023, l_motor)))
-        r_motor = int(max(0, min(1023, r_motor)))
-
-        # 使用 JSON 格式发送数据
-        data = {"l_motor": l_motor, "r_motor": r_motor}
-        e.send(peer, json.dumps(data))  # 将数据转换为 JSON 字符串并发送
+        #lcd.show_gamepad(gamepad_data, diff_ns)  #lcd显示数据
         
-        print(f'前进速度:{lx_raw}, 转向速度:{ry_raw}, l_motor:{l_motor}, r_motor:{r_motor}')
+        time.sleep(0.001)
+        
+        # time.sleep(1) 
 
-    else:
-        # 使用 JSON 格式发送数据
-        data = {"l_motor": 0, "r_motor": 0}
-        e.send(peer, json.dumps(data))  # 将数据转换为 JSON 字符串并发送
 
-# 开启定时器
-tim = Timer(1)
-tim.init(period=20, mode=Timer.PERIODIC, callback=main)  # 周期200ms
+def main():
+    _thread.start_new_thread(send_espnow, ())
+    _thread.start_new_thread(show_lcd, ())
+
+    while True:
+        time.sleep(1)  # 主线程保持运行
+
+
+# 运行主函数
+main()
