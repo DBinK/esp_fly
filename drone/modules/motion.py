@@ -1,95 +1,89 @@
-from machine import SoftI2C, Pin, PWM  # type: ignore  # noqa: F401
+"""
+    Omni Bot 全向轮 运动控制模块
+    by: DBin_K
+"""
 
-KEY  = Pin(0,Pin.IN,Pin.PULL_UP)         # 构建KEY对象
+import time
+import math
+from machine import Pin, PWM  # type: ignore
 
-lf_bh_back = PWM(Pin(15), freq=50)
-lf_bh_go   = PWM(Pin(16), freq=50)
-
-lf_ft_back = PWM(Pin(17), freq=50)
-lf_ft_go   = PWM(Pin(18), freq=50)
-
-rt_bh_back = PWM(Pin(21), freq=50)
-rt_bh_go   = PWM(Pin(34), freq=50)
-
-rt_ft_back = PWM(Pin(35), freq=50)
-rt_ft_go   = PWM(Pin(36), freq=50)
+from modules.utils import limit_value, map_value
 
 
-# 四个轮子单独控制函数
-def lf_ft(pwm_val):
-    if pwm_val > 0:
-        lf_ft_go.duty(pwm_val)
-        lf_ft_back.duty(0)
-    else:
-        lf_ft_back.duty(-pwm_val)
-        lf_ft_go.duty(0)
+class MotorESC:
+    def __init__(
+        self,
+        pin,                    # PWM 引脚号
+        freq      = 400,        # PWM 频率 (最大不超过500Hz,即2000us)
+        min_us    = 1000,       # 最小脉宽 us
+        max_us    = 2000,       # 最大脉宽 us         
+        max_thr   = 1000,       # 可达最大油门 (0~2000)
+        min_accu  = 1,          # 最小油门控制精度
 
-def lf_bh(pwm_val):
-    if pwm_val > 0:
-        lf_bh_go.duty(pwm_val)
-        lf_bh_back.duty(0)
-    else:
-        lf_bh_back.duty(-pwm_val)
-        lf_bh_go.duty(0)
+        target_thr    = 0,    # 初始化目标油门
+        limit_min_thr = 0,    # 最小油门限制
+        limit_max_thr = 1000  # 最大油门限制
+    ):
+        self.pin = pin
+        self.pwm = PWM(Pin(pin), freq=freq, duty=0)
 
-def rt_ft(pwm_val):
-    if pwm_val > 0:
-        rt_ft_go.duty(pwm_val)
-        rt_ft_back.duty(0)
-    else:
-        rt_ft_back.duty(-pwm_val)
-        rt_ft_go.duty(0)
+        self.freq         = freq          # 频率
+        self.min_us       = min_us        # 最小脉宽
+        self.max_us       = max_us        # 最大脉宽
+        self.max_thr      = max_thr       # 最大油门
+        self.min_accu     = min_accu      # 最小精度
 
-def rt_bh(pwm_val):
-    if pwm_val > 0:
-        rt_bh_go.duty(pwm_val)
-        rt_bh_back.duty(0)
-    else:
-        rt_bh_back.duty(-pwm_val)
-        rt_bh_go.duty(0)
+        self.limit_max_thr = limit_max_thr  # 最大油门限制
+        self.limit_min_thr = limit_min_thr  # 最小油门限制
 
+        self.target_thr = target_thr  # 初始化目标油门
+        self.set_thr(target_thr)
 
-# 四个轮子同时控制函数
+    def set_limit(self, limit_min_thr, limit_max_thr):  # 设置油门限制
+        self.limit_max_thr = limit_max_thr
+        self.limit_min_thr = limit_min_thr
 
-def move(v_y, v_x, v_w):
-    # 四个轮子的速度分解
+    def set_thr(self, target_thr):  # 绝对油门运动控制
 
-    v1 = v_y + v_x - v_w
-    v2 = v_y - v_x - v_w
-    v3 = v_y - v_x + v_w
-    v4 = v_y + v_x + v_w
+        # print(f"set_thr(): 传入 {self.pin} 号电机的目标油门: {target_thr}")
 
-    # 增加限位, 让所有速度不超过(-1023, 1023)
-    v1 = max(-1023, min(1023, v1))
-    v2 = max(-1023, min(1023, v2))
-    v3 = max(-1023, min(1023, v3))
-    v4 = max(-1023, min(1023, v4))
+        target_thr = min(max(target_thr, self.limit_min_thr), self.limit_max_thr) # 限制油门
 
-    lf_ft(v1)
-    lf_bh(v2)
+        print(f"set_thr(): 实际 {self.pin} 号电机可达油门: {target_thr}\n")
 
-    rt_ft(v3)
-    rt_bh(v4)
+        self.target_thr = target_thr
 
-def go_forward(pwm_val):
-    move(pwm_val, 0, 0)
+        us = self.min_us + (self.max_us - self.min_us) * (target_thr / self.max_thr)
+        ns = int(us * 1000)
+        print(f"输入脉宽{us}")
 
-def go_backward(pwm_val):
-    move(-pwm_val, 0, 0)
+        self.pwm.duty_ns(ns) # 设置 PWM 脉宽
 
-def go_left(pwm_val):
-    move(0, -pwm_val, 0)
+    def get_thr(self):  # 查询当前油门
+        return self.target_thr
 
-def go_right(pwm_val):
-    move(0, pwm_val, 0)
+    def set_thr_relative(self, relative_thr):  # 相对油门运动控制
+        print(f"set_thr_relative(): 传入 {self.pin} 号电机的相对油门: {relative_thr}")
+        self.target_thr += relative_thr
+        self.set_thr(self.target_thr)
 
-def turn_left(pwm_val):
-    move(0, 0, pwm_val)
-
-def turn_right(pwm_val):
-    move(0, 0, -pwm_val)
-    
-def stop():
-    go_forward(0)
+    def reset(self, target_thr=0):  # 复位
+        self.set_thr(target_thr)
+        print("reset(): 复位电机")
 
 
+if __name__ == "__main__":
+
+    motor_1 = MotorESC(39)
+    motor_1.set_thr(200)
+    print("set_thr(): 设置目标油门为 200")
+
+    time.sleep(5)
+
+    motor_1.set_thr_relative(100)
+    print("set_thr_relative(): 增加目标油门为 100")
+
+    time.sleep(5)
+
+    motor_1.reset()
+    print("reset(): 复位电机")

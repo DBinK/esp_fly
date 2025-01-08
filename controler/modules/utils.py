@@ -19,6 +19,7 @@ def debounce(delay_ns):
 
     return decorator
 
+
 def timeit(func):
     """装饰器: 测量函数执行时间, 优化性能的时候测试用"""
     def wrapper(*args, **kwargs):

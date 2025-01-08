@@ -50,7 +50,6 @@ def data_to_json(data):
     
     return json.dumps(data_dict)
 
-
 def show_lcd():
     global gamepad_data, diff_ns
     

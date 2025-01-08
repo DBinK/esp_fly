@@ -1,53 +1,92 @@
 import time
 import network
-import espnow
-import json 
+from machine import Pin
 
-from machine import Pin, PWM  # type: ignore
+from modules.now_recv import read_espnow
+from modules.motion import MotorESC
+from modules.utils import map_value
 
-# 初始化 PWM 引脚
-in1 = PWM(Pin(5, Pin.OUT), freq=100000, duty=0)
-in2 = Pin(6, Pin.OUT, value=0)
+time.sleep(1)  # 防止点停止按钮后马上再启动导致 Thonny 连接不上
 
-in3 = PWM(Pin(9, Pin.OUT), freq=100000, duty=0)
-in4 = Pin(10, Pin.OUT, value=0) 
+# motor_1 = MotorESC(39)
+# motor_2 = MotorESC(37)
+# motor_3 = MotorESC(35)
+# motor_4 = MotorESC(33)
 
-# A WLAN interface must be active to send()/recv()
-sta = network.WLAN(network.STA_IF)
-sta.active(True)
-sta.disconnect()  # 因为 ESP8266 会自动连接到最后一个接入点
+motor_1 = MotorESC(18)
+motor_2 = MotorESC(16)
+motor_3 = MotorESC(21)
+motor_4 = MotorESC(17)
 
-e = espnow.ESPNow()
-e.active(True)
+# 初始化 LED
+led = Pin(15, Pin.OUT, value=1)
 
-peer = b'\xff\xff\xff\xff\xff\xff'  # 同伴的 WiFi 接口的 MAC 地址
-e.add_peer(peer)  
+DEAD_AREA = 20  # 摇杆死区
+MAP_COEFF = 58  # 摇杆映射系数 (根据实际需求调整)
 
 while True:
-    host, msg = e.recv()
-    if msg:  # msg == None 如果在 recv() 中超时
-        print(host, msg)
 
-        # 解析 JSON 消息
-        try:
-            data = json.loads(msg)  # 将接收到的消息从 JSON 字符串转换为字典
-            v_pwm_l = data.get("l_motor", 0)  # 获取左电机的 PWM 值，默认为0
-            v_pwm_r = data.get("r_motor", 0)  # 获取右电机的 PWM 值，默认为0
+    time.sleep(0.001)
+
+    data = read_espnow()
+
+    if data:
+
+        lx = data[1]  
+        ly = data[2]
+        rx = data[3]
+        ry = data[4]
+        other = data[6]
+
+        if other != 0:
+            motor_1.reset()
+            motor_2.reset()
+            motor_3.reset()
+            motor_4.reset()
             
-            # 设置 PWM 值
-            in1.duty(v_pwm_l)  # 设置左电机 PWM
-            in3.duty(v_pwm_r)  # 设置右电机 PWM
-            
-            print(f'左电机 PWM 值: {v_pwm_l}, 右电机 PWM 值: {v_pwm_r}')
+            led.value(not led.value())  # 闪烁led
+            continue
         
-        except ValueError as e:
-            print(f'解析消息失败: {e}')  # 处理解析错误
-            continue 
 
-        if msg == b'end':
-            break
-    else:
-        # 设置 PWM 值
-        in1.duty(0)  # 设置左电机 PWM
-        in3.duty(0)  # 设置右电机 PWM
-        print('No message received')
+        # print(f"原始数据: lx={lx}, ly={ly}, rx={rx}, ry={ry}")
+
+        lx += 16
+        ly += 35
+        rx += 6
+        ry += 16
+
+        print(f"矫正后数据: lx={lx}, ly={ly}, rx={rx}, ry={ry}")
+
+        # 检查lx, ly, rx, ry中是否至少有一个绝对值超过设定值
+        stick_work = (
+               abs(lx-127) > DEAD_AREA
+            or abs(ly-127) > DEAD_AREA
+            or abs(rx-127) > DEAD_AREA
+            or abs(ry-127) > DEAD_AREA
+        )
+
+        if stick_work:
+            led.value(not led.value())  # 闪烁led
+
+            # 底盘控制
+            _ly = map_value(ly, (0, 255), (-127, 127))  if abs(ly-127) > DEAD_AREA else 0
+            _lx = map_value(lx, (0, 255), (-127, 127))  if abs(lx-127) > DEAD_AREA else 0
+            _ry = map_value(ry, (0, 255), (-127, 127))  if abs(ry-127) > DEAD_AREA else 0
+            _rx = map_value(rx, (0, 255), (-127, 127))  if abs(rx-127) > DEAD_AREA else 0
+
+            print(f"摇杆映射后数据: lx={_lx}, ly={_ly}, rx={_rx}, ry={_ry}")
+
+            _ly *= 0.1
+            _lx *= 0.05
+            _ry *= 0.01
+            _rx *= 0.05
+            
+            print(f"摇杆缩放后数据: lx={_lx}, ly={_ly}, rx={_rx}, ry={_ry}")
+
+            motor_1.set_thr_relative(_ly)
+            motor_3.set_thr_relative(_lx)
+            motor_2.set_thr_relative(_ry)
+            motor_4.set_thr_relative(_rx)
+
+        else:
+            led.value(0)

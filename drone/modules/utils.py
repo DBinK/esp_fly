@@ -36,7 +36,7 @@ def limit_value(value, min_value=-3000, max_value=3000):
     """限制输入的值在给定的范围内。"""
     return min(max(value, min_value), max_value)
     
-def map_value(self, value, original_block, target_block):
+def map_value(value, original_block, target_block):
     """将给定的值映射到给定的目标范围。"""
     original_min, original_max = original_block
     target_min, target_max = target_block
