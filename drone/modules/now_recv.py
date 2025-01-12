@@ -36,7 +36,7 @@ OFFSET_ry = 16
 
 def read_espnow():
     """读取espnow数据并进行解包处理"""
-    host, msg = now.recv(5)  # 读取所有可用的数据, 参数: 超时时间ms
+    host, msg = now.recv(0)  # 读取所有可用的数据, 参数: 超时时间ms
 
     #print("espnow数据:", msg)
 
