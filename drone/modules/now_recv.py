@@ -65,6 +65,40 @@ def read_espnow():
     else:  # 如果没有数据，则返回
         return None, False
 
+def process_data(data):
+    
+    data, stick_work = read_espnow()
+
+    if data:
+        
+        if data[6] != 0x0:
+            # 电机停转
+            pass
+
+        if stick_work:
+
+            ly = data[1]
+            lx = data[2]
+            ry = data[4]
+            rx = data[3]
+            
+            # 底盘控制
+            _ly = map_value(ly, (0, 255), (-127, 127))  
+            _lx = map_value(lx, (0, 255), (-127, 127))  
+            _ry = map_value(ry, (0, 255), (-127, 127))  
+            _rx = map_value(rx, (0, 255), (-127, 127))
+
+            # print(f"摇杆映射后数据: lx={_lx}, ly={_ly}, rx={_rx}, ry={_ry}")
+
+            data[1] *= 0.1
+            data[2] *= 0.05
+            data[3] *= 0.08
+            data[4] *= 0.05
+            
+            print(f"摇杆缩放后数据: lx={_lx}, ly={_ly}, rx={_rx}, ry={_ry}")
+
+            return data
+
 
 if __name__ == "__main__":
     print("正在读取espnow数据...")

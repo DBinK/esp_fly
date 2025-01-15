@@ -29,6 +29,7 @@ class PID:
         self.prev_error = error
         self.last_time = current_time
         return output
+    
     def update_with_det(self, measured_value, derivative):
         current_time = time.time_ns()
         dt = (current_time - self.last_time) / 1_000_000_000  # 转换为秒

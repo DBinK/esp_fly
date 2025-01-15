@@ -72,6 +72,61 @@ class MotorESC:
         print("reset(): 复位电机")
 
 
+class MotorController:
+    """
+    *备  注: 四轴机头与电机示意图	
+					 机头(Y+)
+					   
+				  M1    ↑    M2
+					\   |   /
+					 \  |  /
+					  \ | /
+			    ————————+————————>X+	
+					  / | \
+					 /  |  \
+					/   |   \
+				  M4    |    M3
+
+	
+	1. M1 M3电机逆时针旋转, M2 M4电机顺时针旋转
+	2. X:是MPU6050的 X 轴, Y:是MPU6050的 Y 轴, Z轴正方向垂直 X-Y 面, 竖直向上
+	3. 绕 X 轴旋转为PITCH 角 
+	   绕 Y 轴旋转为 ROLL 角 
+	   绕 Z 轴旋转为 YAW  角
+    """
+    def __init__(self, m1, m2, m3, m4, limit_min_thr=0, limit_max_thr=1000):
+        self.motor_1 = MotorESC(m1)
+        self.motor_2 = MotorESC(m2)
+        self.motor_3 = MotorESC(m3)
+        self.motor_4 = MotorESC(m4)
+        self.motors = [self.motor_1, self.motor_2, self.motor_3, self.motor_4]
+        self.set_motors_limit(limit_min_thr, limit_max_thr)
+        self.reset()
+
+    def set_motors_limit(self, limit_min_thr, limit_max_thr):
+        for i in range(len(self.motors)):
+            self.motors[i].set_limit(limit_min_thr, limit_max_thr)
+
+    def set_motors_thr(self, thr_list):
+        for i in range(len(self.motors)):
+            self.motors[i].set_thr(thr_list[i])
+
+    def set_motors_thr_relative(self, thr_list):
+        for i in range(len(self.motors)):
+            self.motors[i].set_thr_relative(thr_list[i])
+
+    def get_motors_thr(self):
+        thr_list = []
+        for i in range(len(self.motors)):
+            thr_list.append(self.motors[i].get_thr())
+        return thr_list
+
+    def reset(self):
+        for i in range(len(self.motors)):
+            self.motors[i].reset()
+
+
+
 if __name__ == "__main__":
 
     motor_1 = MotorESC(39)
@@ -87,3 +142,13 @@ if __name__ == "__main__":
 
     motor_1.reset()
     print("reset(): 复位电机")
+
+# motor_1 = MotorESC(39)
+# motor_2 = MotorESC(37)
+# motor_3 = MotorESC(35)
+# motor_4 = MotorESC(33)
+
+# motor_1 = MotorESC(18)
+# motor_2 = MotorESC(16) 
+# motor_3 = MotorESC(21)
+# motor_4 = MotorESC(17)

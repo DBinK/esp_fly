@@ -2,21 +2,13 @@ import time
 import network
 from machine import Pin
 
-from modules.now_recv import read_espnow
-from modules.motion import MotorESC
+from modules.now_recv import read_espnow, process_data
+from modules.motion import MotorController
 from modules.utils import map_value, TimeDiff
 
 time.sleep(1)  # 防止点停止按钮后马上再启动导致 Thonny 连接不上
 
-# motor_1 = MotorESC(39)
-# motor_2 = MotorESC(37)
-# motor_3 = MotorESC(35)
-# motor_4 = MotorESC(33)
-
-motor_1 = MotorESC(18)
-motor_2 = MotorESC(16) 
-motor_3 = MotorESC(21)
-motor_4 = MotorESC(17)
+motors = MotorController(18, 16, 21, 17, limit_max_thr=950)
 
 loop_dt = TimeDiff()
 
@@ -30,42 +22,57 @@ while True:
     # time.sleep(0.1)
     time.sleep(0.001)
 
-    data , stick_work = read_espnow()
+    data, stick_work = read_espnow()
+    data = process_data(data)
 
     if data:
         
         if data[6] != 0x0:
-            motor_1.reset()
-            motor_2.reset()
-            motor_3.reset()
-            motor_4.reset()
+            motors.reset()
 
         if stick_work:
 
-            ly = data[1]
-            lx = data[2]
-            ry = data[4]
-            rx = data[3]
-            
-            # 底盘控制
-            _ly = map_value(ly, (0, 255), (-127, 127))  
-            _lx = map_value(lx, (0, 255), (-127, 127))  
-            _ry = map_value(ry, (0, 255), (-127, 127))  
-            _rx = map_value(rx, (0, 255), (-127, 127))
+            roll_output  = _rx  # 更新滚转输出
+            pitch_output = _ry  # 更新俯仰输出
+            yaw_output   = _lx  # 更新偏航输出
 
-            # print(f"摇杆映射后数据: lx={_lx}, ly={_ly}, rx={_rx}, ry={_ry}")
+            z_output     = _ly
 
-            _ly *= 0.1
-            _lx *= 0.05
-            _ry *= 0.08
-            _rx *= 0.05
-            
-            print(f"摇杆缩放后数据: lx={_lx}, ly={_ly}, rx={_rx}, ry={_ry}")
+            # 综合控制输出
+            motor1 = z_output + roll_output + pitch_output + yaw_output  # 电机1输出
+            motor2 = z_output - roll_output + pitch_output - yaw_output  # 电机2输出
+            motor3 = z_output - roll_output - pitch_output + yaw_output  # 电机3输出
+            motor4 = z_output + roll_output - pitch_output - yaw_output  # 电机4输出
 
-            motor_1.set_thr_relative(_ly)
-            motor_2.set_thr_relative(_lx)
-            motor_3.set_thr_relative(_ry)
-            motor_4.set_thr_relative(_rx)
+            # 设置电机输出
+            motors.set_motors_thr([motor1, motor2, motor3, motor4])
 
+"""
+*函  数：void Control(FLOAT_ANGLE *att_in,FLOAT_XYZ *gyr_in, RC_TYPE *rc_in, uint8_t armed)
+*功  能：姿态控制,角度环控制和角速度环控制
+*参  数：att_in：测量值
+*        gry_in: MPU6050读取的角速度值
+*        rc_in : 遥控器设定值
+*        armed记录命令
+*返回值：无
+*备  注：RoboFly 小四轴机头与电机示意图	
+					 机头(Y+)
+					   
+				  M1    ↑    M2
+					\   |   /
+					 \  |  /
+					  \ | /
+			    ————————+————————>X+	
+					  / | \
+					 /  |  \
+					/   |   \
+				  M4    |    M3
 
+	
+	1. M1 M3电机逆时针旋转, M2 M4电机顺时针旋转
+	2. X:是MPU6050的 X 轴, Y:是MPU6050的 Y 轴, Z轴正方向垂直 X-Y 面, 竖直向上
+	3. 绕 X 轴旋转为PITCH 角 
+	   绕 Y 轴旋转为 ROLL 角 
+	   绕 Z 轴旋转为 YAW  角
+	4. 自己DIY时进行动力分配可以一个轴一个轴的分配, 切勿三个轴同时分配。"""
 
