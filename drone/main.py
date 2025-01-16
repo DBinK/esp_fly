@@ -2,15 +2,28 @@ import time
 import network
 from machine import Pin
 
+from modules.fusion import Fusion
 from modules.now_recv import read_espnow, process_data
 from modules.motion import MotorController
-from modules.utils import map_value, TimeDiff
+from modules.pid import PID
+from modules.utils import TimeDiff
+
 
 time.sleep(1)  # 防止点停止按钮后马上再启动导致 Thonny 连接不上
 
+loop_dt = TimeDiff()
 motors = MotorController(18, 16, 21, 17, limit_max_thr=950)
 
-loop_dt = TimeDiff()
+# 初始化角度环 PID
+pitch_angle_pid = PID(kp=0.05, ki=0.0, kd=0.0, setpoint=0, output_limits=(-100, 100))
+roll_angle_pid  = PID(kp=0.0, ki=0.0, kd=0.0, setpoint=0, output_limits=(-100, 100))
+# yaw_angle_pid   = PID(kp=0.05, ki=0.0, kd=0.0, setpoint=0, output_limits=(-1000, 1000))
+
+# 初始化角速度环 PID
+pitch_rate_pid  = PID(kp=0.05, ki=0.0, kd=0.0, setpoint=0, output_limits=(-1000, 1000))
+roll_rate_pid   = PID(kp=0.00, ki=0.0, kd=0.0, setpoint=0, output_limits=(-1000, 1000))
+yaw_rate_pid    = PID(kp=0.00, ki=0.0, kd=0.0, setpoint=0, output_limits=(-1000, 1000))
+
 
 while True:
 
@@ -26,14 +39,19 @@ while True:
     data = process_data(data)
 
     if data:
+
+        _ly = data[1]
+        _lx = data[2]
+        _ry = data[4]
+        _rx = data[3]
         
         if data[6] != 0x0:
             motors.reset()
 
         if stick_work:
 
+            pitch_output = pitch_angle_pid.update(data[0])  # 更新俯仰输出
             roll_output  = _rx  # 更新滚转输出
-            pitch_output = _ry  # 更新俯仰输出
             yaw_output   = _lx  # 更新偏航输出
 
             z_output     = _ly

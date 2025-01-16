@@ -11,14 +11,19 @@ class PID:
         self.output_limits = output_limits
         self.last_time = time.time_ns()  # 使用ns计时
 
-    def update(self, measured_value):
+    def update(self, measured_value, setpoint=None, derivative=None):
         current_time = time.time_ns()
         dt = (current_time - self.last_time) / 1_000_000_000  # 转换为秒
 
+        if setpoint is not None:
+            self.setpoint = setpoint
+
         error = self.setpoint - measured_value
         self.integral += error * dt
-        derivative = (error - self.prev_error) / dt if dt > 0 else 0
-        
+
+        if derivative is None:
+            derivative = (error - self.prev_error) / dt if dt > 0 else 0
+            
         output = self.kp * error + self.ki * self.integral + self.kd * derivative
         
         if self.output_limits[0] is not None and output < self.output_limits[0]:
@@ -30,24 +35,27 @@ class PID:
         self.last_time = current_time
         return output
     
-    def update_with_det(self, measured_value, derivative):
-        current_time = time.time_ns()
-        dt = (current_time - self.last_time) / 1_000_000_000  # 转换为秒
+    # def update_with_det(self, measured_value, derivative, setpoint=None):
+    #     current_time = time.time_ns()
+    #     dt = (current_time - self.last_time) / 1_000_000_000  # 转换为秒
 
-        error = self.setpoint - measured_value
-        self.integral += error * dt
-        #derivative = (error - self.prev_error) / dt if dt > 0 else 0
-        
-        output = self.kp * error + self.ki * self.integral + self.kd * derivative  # 使用给定的微分值
-        
-        if self.output_limits[0] is not None and output < self.output_limits[0]:
-            output = self.output_limits[0]
-        if self.output_limits[1] is not None and output > self.output_limits[1]:
-            output = self.output_limits[1]
+    #     if setpoint is not None:
+    #         self.setpoint = setpoint
 
-        self.prev_error = error
-        self.last_time = current_time
-        return output
+    #     error = self.setpoint - measured_value
+    #     self.integral += error * dt
+    #     #derivative = (error - self.prev_error) / dt if dt > 0 else 0
+        
+    #     output = self.kp * error + self.ki * self.integral + self.kd * derivative  # 使用给定的微分值
+        
+    #     if self.output_limits[0] is not None and output < self.output_limits[0]:
+    #         output = self.output_limits[0]
+    #     if self.output_limits[1] is not None and output > self.output_limits[1]:
+    #         output = self.output_limits[1]
+
+    #     self.prev_error = error
+    #     self.last_time = current_time
+    #     return output
 
 # 示例使用
 if __name__ == "__main__":
