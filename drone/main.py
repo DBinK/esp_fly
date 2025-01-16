@@ -1,8 +1,9 @@
 import time
 import network
+import _thread 
 from machine import Pin
 
-from modules.fusion import Fusion
+from modules.imu import imu_update
 from modules.now_recv import read_espnow, process_data
 from modules.motion import MotorController
 from modules.pid import PID
@@ -11,7 +12,9 @@ from modules.utils import TimeDiff
 
 time.sleep(1)  # 防止点停止按钮后马上再启动导致 Thonny 连接不上
 
-loop_dt = TimeDiff()
+imu_dt = TimeDiff()
+rc_dt  = TimeDiff()
+
 motors = MotorController(18, 16, 21, 17, limit_max_thr=950)
 
 # 初始化角度环 PID
@@ -24,37 +27,75 @@ pitch_rate_pid  = PID(kp=0.05, ki=0.0, kd=0.0, setpoint=0, output_limits=(-1000,
 roll_rate_pid   = PID(kp=0.00, ki=0.0, kd=0.0, setpoint=0, output_limits=(-1000, 1000))
 yaw_rate_pid    = PID(kp=0.00, ki=0.0, kd=0.0, setpoint=0, output_limits=(-1000, 1000))
 
+rc_data = [0, 0, 0, 0, 0, 0, 0, 0]
+stick_work = False
 
-while True:
+def rc_loop():
+    
+    global rc_data, stick_work
 
-    ms = loop_dt.time_diff() / 1_000_000
-    Hz = int(1/(ms/1000)) # if ms > 0.0001 else 0
+    while True:
+        time.sleep(0.1)
+        # time.sleep(0.001)
 
-    print(f"循环时间: {ms:.3f}ms, 频率: {Hz}Hz")
+        ms = rc_dt.time_diff() / 1_000_000
+        Hz = int(1/(ms/1000)) # if ms > 0.0001 else 0
 
-    # time.sleep(0.1)
-    time.sleep(0.001)
+        print(f"rc_loop() 循环时间: {ms:.3f}ms, 频率: {Hz}Hz")
 
-    data, stick_work = read_espnow()
-    data = process_data(data)
+        data, stick_work = read_espnow()
+        rc_data = process_data(data)
 
-    if data:
+def imu_loop():
+    
+    global rc_data, stick_work
 
-        _ly = data[1]
-        _lx = data[2]
-        _ry = data[4]
-        _rx = data[3]
+    while True:
+        # time.sleep(0.1)
+        time.sleep(0.001)
+
+        ms = imu_dt.time_diff() / 1_000_000
+        Hz = int(1/(ms/1000)) # if ms > 0.0001 else 0
+
+        print(f"imu_loop() 循环时间: {ms:.3f}ms, 频率: {Hz}Hz")
+
+        # 获取摇杆数据
+        if rc_data is not None:
+            _ly = rc_data[1]
+            _lx = rc_data[2]
+            _ry = rc_data[3]
+            _rx = rc_data[4]
         
-        if data[6] != 0x0:
-            motors.reset()
+            if rc_data[6] != 0x0:  # 急停保险
+                motors.reset() 
 
-        if stick_work:
+            if stick_work:
+                pass
 
-            pitch_output = pitch_angle_pid.update(data[0])  # 更新俯仰输出
-            roll_output  = _rx  # 更新滚转输出
-            yaw_output   = _lx  # 更新偏航输出
+        # 更新imu数据
+        result = imu_update()
+        if result is None:
+            print("imu_update() 返回 None，跳过本次循环")
+            continue
 
-            z_output     = _ly
+        yaw, roll, pitch, gyro = result 
+
+        roll = -roll  # 翻转极性以符合gy
+
+        if gyro:
+
+            pitch_rate_target = pitch_angle_pid.update(pitch, derivative=gyro[0])  # 更新俯仰输出
+            roll_rate_target  = roll_angle_pid.update(roll, derivative=gyro[1])  # 更新滚转输出
+            yaw_rate_target   = 0 # yaw_angle_pid.update(yaw)  # 更新偏航输出
+
+            print(f"pid_rate: {pitch_rate_target=:.2f}, {roll_rate_target=:.2f}, {yaw_rate_target=:.2f}")
+
+            pitch_output = pitch_rate_pid.update(pitch, setpoint = pitch_rate_target)  # 更新俯仰输出
+            roll_output  = roll_rate_pid.update(roll, setpoint = roll_rate_target)  # 更新滚转输出
+            yaw_output   = yaw_rate_pid.update(gyro[1])  # 更新偏航输出
+            z_output     = _ly * 0.01
+
+            print(f"pid_angle: {pitch_output=:.2f}, {roll_output=:.2f}, {yaw_output=:.2f}")
 
             # 综合控制输出
             motor1 = z_output + roll_output + pitch_output + yaw_output  # 电机1输出
@@ -62,8 +103,15 @@ while True:
             motor3 = z_output - roll_output - pitch_output + yaw_output  # 电机3输出
             motor4 = z_output + roll_output - pitch_output - yaw_output  # 电机4输出
 
+            print(f"motor: {motor1=:.2f}, {motor2=:.2f}, {motor3=:.2f}, {motor4=:.2f}")
+
             # 设置电机输出
             motors.set_motors_thr([motor1, motor2, motor3, motor4])
+
+# 创建两个线程
+_thread.start_new_thread(rc_loop, ())   # 创建一个线程，执行 rc_loop() 函数
+_thread.start_new_thread(imu_loop, ())  # 创建一个线程，执行 imu_loop() 函数
+
 
 """
 *函  数：void Control(FLOAT_ANGLE *att_in,FLOAT_XYZ *gyr_in, RC_TYPE *rc_in, uint8_t armed)

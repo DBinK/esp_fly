@@ -50,7 +50,7 @@ def read_espnow():
         data[3] += OFFSET_rx   # rx 摇杆校准
         data[4] += OFFSET_ry   # ry 摇杆校准
 
-        print(f"矫正后数据: lx={data[1]}, ly={data[2]}, rx={data[3]}, ry={data[4]}")
+        # print(f"矫正后数据: lx={data[1]}, ly={data[2]}, rx={data[3]}, ry={data[4]}")
 
         # 检查任意摇杆是否在活动状态
         stick_work = any(abs(value - 127) > DEAD_AREA for value in data[1:5])  
@@ -88,14 +88,14 @@ def process_data(data):
             _ry = map_value(ry, (0, 255), (-127, 127))  
             _rx = map_value(rx, (0, 255), (-127, 127))
 
-            # print(f"摇杆映射后数据: lx={_lx}, ly={_ly}, rx={_rx}, ry={_ry}")
+            print(f"摇杆映射后数据: lx={_lx}, ly={_ly}, rx={_rx}, ry={_ry}")
 
-            data[1] *= 0.1
-            data[2] *= 0.05
-            data[3] *= 0.08
-            data[4] *= 0.05
+            data[1] = _ly
+            data[2] = _lx
+            data[3] = _rx
+            data[4] = _ry
             
-            print(f"摇杆缩放后数据: lx={_lx}, ly={_ly}, rx={_rx}, ry={_ry}")
+            # print(f"摇杆缩放后数据: lx={_lx}, ly={_ly}, rx={_rx}, ry={_ry}")
 
             return data
 

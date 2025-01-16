@@ -49,13 +49,13 @@ class MotorESC:
 
         target_thr = min(max(target_thr, self.limit_min_thr), self.limit_max_thr) # 限制油门
 
-        print(f"set_thr(): 实际 {self.pin} 号电机可达油门: {target_thr}\n")
+        # print(f"set_thr(): 实际 {self.pin} 号电机可达油门: {target_thr}\n")
 
         self.target_thr = target_thr
 
         us = self.min_us + (self.max_us - self.min_us) * (target_thr / self.max_thr)
         ns = int(us * 1000)
-        print(f"输入脉宽{us}")
+        # print(f"输入脉宽{us}")
 
         self.pwm.duty_ns(ns) # 设置 PWM 脉宽
 
@@ -63,7 +63,7 @@ class MotorESC:
         return self.target_thr
 
     def set_thr_relative(self, relative_thr):  # 相对油门运动控制
-        print(f"set_thr_relative(): 传入 {self.pin} 号电机的相对油门: {relative_thr}")
+        # print(f"set_thr_relative(): 传入 {self.pin} 号电机的相对油门: {relative_thr}")
         self.target_thr += relative_thr
         self.set_thr(self.target_thr)
 
